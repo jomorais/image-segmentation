@@ -25,4 +25,15 @@ d_p_g = np.mean(desvio_padrao[..., 1], dtype=np.double)
 d_p_b = np.mean(desvio_padrao[..., 2], dtype=np.double)
 
 print 'Desvio padrao'
-print d_p_r, d_p_g, d_p_b
+
+
+d_p_qr = np.power(d_p_r, 2)
+d_p_qg = np.power(d_p_g, 2)
+d_p_qb = np.power(d_p_b, 2)
+
+m_q = np.power(i_media, 2)
+
+print d_p_qr
+
+den = (m_q[...,0]/d_p_qr) + (m_q[...,1]/d_p_qg) + (m_q[...,2]/d_p_qb)
+
