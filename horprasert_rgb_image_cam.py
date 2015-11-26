@@ -10,11 +10,11 @@ cap = cv2.VideoCapture(0)
 ret = cap.set(3, 320)
 ret = cap.set(4, 240)
 
-fig = plt.figure( 1 )
-ax = fig.add_subplot( 111 )
+fig = plt.figure(1)
+ax = fig.add_subplot(111)
 ax.set_title("My Title")
 
-im = ax.imshow( np.zeros( ( 240, 320, 3 ) ) ) # Blank starting image
+im = ax.imshow(np.zeros((240, 320, 3)))  # Blank starting image
 fig.show()
 im.axes.figure.canvas.draw()
 
@@ -55,14 +55,16 @@ t_CD = 4.5
 i_soma = 0
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
-    #i_atual = misc.imread('images/image{}.bmp'.format(i))
+    i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+    # i_atual = misc.imread('images/image{}.bmp'.format(i))
     i_soma += i_atual.astype(np.double)
 i_media = i_soma / N_FRAMES_BG
 
 s_num_desvio = np.zeros((240, 320, 3), dtype=np.double)
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
-    #i_atual = misc.imread('images/image{}.bmp'.format(i))
+    i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+    # i_atual = misc.imread('images/image{}.bmp'.format(i))
     s_num_desvio += np.power(i_atual.astype(np.double) - i_media, 2)
 desvio_padrao = np.sqrt(s_num_desvio / (N_FRAMES_BG - 1))
 
@@ -86,7 +88,8 @@ CD_s = np.zeros((240, 320), dtype=np.double)
 
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
-    #i_atual = misc.imread('images/image{}.bmp'.format(i)).astype(np.double)
+    i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+    # i_atual = misc.imread('images/image{}.bmp'.format(i)).astype(np.double)
     i_atual = i_atual.astype(np.double)
     d_n = np.empty_like(i_atual)
     d_n[:, :, R] = (i_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
@@ -116,15 +119,19 @@ CD_rms[CD_rms < CD_RMS_MIN] = CD_RMS_MIN
 
 N_FRAMES_BG = 207
 print 'Aprendeu'
+import timeit
 
-time.sleep(10)
-#for i in range(201, N_FRAMES_BG + 1):
+# for i in range(201, N_FRAMES_BG + 1):
+
+
 while True:
-    #im_ref = misc.imread('images/imageref{}.bmp'.format(i)).astype(np.double)
-    #im_ref = np.fix(im_ref * 255)
-    #im_ref = im_ref[..., 0]
-    #frame = misc.imread('images/image{}.bmp'.format(i))
+    start = timeit.default_timer()
+    # im_ref = misc.imread('images/imageref{}.bmp'.format(i)).astype(np.double)
+    # im_ref = np.fix(im_ref * 255)
+    # im_ref = im_ref[..., 0]
+    # frame = misc.imread('images/image{}.bmp'.format(i))
     ret, frame = cap.read()
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     im_teste = frame.astype(np.double)
 
     im_teste_r1 = im_teste[:, :, R]
@@ -180,11 +187,14 @@ while True:
     imfinal[:, :, B] = imfinal_b
     im.set_data(np.negative(imfinal))
     im.axes.figure.canvas.draw()
-    #cv2.imshow('frame', imfinal)
-    #plt.subplot(7,2,j)
-    #plt.imshow(imfinal)
-    #plt.show()
-    #j += 1
-    #plt.subplot(7,2,j)
-    #plt.imshow(np.negative(imfinal))
-    #j += 1
+    # cv2.imshow('frame', imfinal)
+    # plt.subplot(7,2,j)
+    # plt.imshow(imfinal)
+    # plt.show()
+    # j += 1
+    # plt.subplot(7,2,j)
+    # plt.imshow(np.negative(imfinal))
+    # j += 1
+    end = timeit.default_timer()
+    print 1/(end - start)
+    #print 1/(end - start)
