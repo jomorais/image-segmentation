@@ -1,8 +1,5 @@
-from scipy import misc
 import numpy as np
-import matplotlib.pyplot as plt
 import cv2
-import time
 
 __author__ = 'jmorais'
 
@@ -10,13 +7,6 @@ cap = cv2.VideoCapture(0)
 ret = cap.set(3, 320)
 ret = cap.set(4, 240)
 
-fig = plt.figure(1)
-ax = fig.add_subplot(111)
-ax.set_title("My Title")
-
-im = ax.imshow(np.zeros((240, 320, 3)))  # Blank starting image
-fig.show()
-im.axes.figure.canvas.draw()
 
 N_FRAMES_BG = 64
 
@@ -57,7 +47,7 @@ for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
     i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
     # i_atual = misc.imread('images/image{}.bmp'.format(i))
-    i_soma += i_atual.astype(np.double)
+    i_soma += i_atual.astype(np.float32)
 i_media = i_soma / N_FRAMES_BG
 
 s_num_desvio = np.zeros((240, 320, 3), dtype=np.double)
@@ -65,12 +55,12 @@ for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
     i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
     # i_atual = misc.imread('images/image{}.bmp'.format(i))
-    s_num_desvio += np.power(i_atual.astype(np.double) - i_media, 2)
+    s_num_desvio += np.power(i_atual.astype(np.float32) - i_media, 2)
 desvio_padrao = np.sqrt(s_num_desvio / (N_FRAMES_BG - 1))
 
-d_p_r = np.mean(desvio_padrao[..., R], dtype=np.double)
-d_p_g = np.mean(desvio_padrao[..., G], dtype=np.double)
-d_p_b = np.mean(desvio_padrao[..., B], dtype=np.double)
+d_p_r = np.mean(desvio_padrao[..., R], dtype=np.float32)
+d_p_g = np.mean(desvio_padrao[..., G], dtype=np.float32)
+d_p_b = np.mean(desvio_padrao[..., B], dtype=np.float32)
 
 print 'Desvio padrao'
 
@@ -82,15 +72,14 @@ m_q = np.power(i_media, 2)
 
 den = (m_q[..., R] / d_p_qr) + (m_q[..., G] / d_p_qg) + (m_q[..., B] / d_p_qb)
 
-alfa_s = np.zeros((240, 320), dtype=np.double)
+alfa_s = np.zeros((240, 320), dtype=np.float32)
 
-CD_s = np.zeros((240, 320), dtype=np.double)
+CD_s = np.zeros((240, 320), dtype=np.float32)
 
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
     i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
-    # i_atual = misc.imread('images/image{}.bmp'.format(i)).astype(np.double)
-    i_atual = i_atual.astype(np.double)
+    i_atual = i_atual.astype(np.float32)
     d_n = np.empty_like(i_atual)
     d_n[:, :, R] = (i_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
     d_n[:, :, G] = (i_atual[:, :, G] * i_media[:, :, G]) / d_p_qg
@@ -119,24 +108,17 @@ CD_rms[CD_rms < CD_RMS_MIN] = CD_RMS_MIN
 
 N_FRAMES_BG = 207
 print 'Aprendeu'
-import timeit
-
-# for i in range(201, N_FRAMES_BG + 1):
-
 
 while True:
-    start = timeit.default_timer()
+    start = cv2.getTickCount()
     # im_ref = misc.imread('images/imageref{}.bmp'.format(i)).astype(np.double)
     # im_ref = np.fix(im_ref * 255)
     # im_ref = im_ref[..., 0]
     # frame = misc.imread('images/image{}.bmp'.format(i))
     ret, frame = cap.read()
+    cv2.imshow('original', frame)
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    im_teste = frame.astype(np.double)
-
-    im_teste_r1 = im_teste[:, :, R]
-    im_teste_g1 = im_teste[:, :, G]
-    im_teste_b1 = im_teste[:, :, B]
+    im_teste = frame.astype(np.float32)
 
     im_teste_r = im_teste[:, :, R]
     im_teste_g = im_teste[:, :, G]
@@ -168,15 +150,15 @@ while True:
     alfa_lim = np.where(alfa < G_ALFA_MIN)
     alfa_lim1 = np.where(alfa > G_ALFA_MAX)
 
-    imfinal = np.zeros((RES_HOR, RES_VERT, 3))
+    imfinal = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.uint8)
 
-    imfinal_r = np.zeros((RES_HOR, RES_VERT))
-    imfinal_g = np.zeros((RES_HOR, RES_VERT))
-    imfinal_b = np.zeros((RES_HOR, RES_VERT))
+    imfinal_r = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
+    imfinal_g = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
+    imfinal_b = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
 
-    im_teste_r = im_teste_r.astype(int)
-    im_teste_g = im_teste_g.astype(int)
-    im_teste_b = im_teste_b.astype(int)
+    im_teste_r = im_teste_r.astype(np.uint8)
+    im_teste_g = im_teste_g.astype(np.uint8)
+    im_teste_b = im_teste_b.astype(np.uint8)
 
     imfinal_r[objeto1] = im_teste_r[objeto1]
     imfinal_g[objeto1] = im_teste_g[objeto1]
@@ -185,16 +167,15 @@ while True:
     imfinal[:, :, R] = imfinal_r
     imfinal[:, :, G] = imfinal_g
     imfinal[:, :, B] = imfinal_b
-    im.set_data(np.negative(imfinal))
-    im.axes.figure.canvas.draw()
-    # cv2.imshow('frame', imfinal)
-    # plt.subplot(7,2,j)
-    # plt.imshow(imfinal)
-    # plt.show()
-    # j += 1
-    # plt.subplot(7,2,j)
-    # plt.imshow(np.negative(imfinal))
-    # j += 1
-    end = timeit.default_timer()
-    print 1/(end - start)
-    #print 1/(end - start)
+
+    cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
+
+    end = cv2.getTickCount()
+
+    print 'FPS: {}'.format(1/((end - start)/cv2.getTickFrequency()))
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# When everything done, release the capture
+cap.release()
+cv2.destroyAllWindows()
