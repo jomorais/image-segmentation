@@ -3,15 +3,18 @@ import cv2
 
 __author__ = 'jmorais'
 
+RES_HOR = 240
+RES_VERT = 320
+
 cap = cv2.VideoCapture(0)
-ret = cap.set(3, 320)
-ret = cap.set(4, 240)
+ret = cap.set(3, RES_VERT)
+ret = cap.set(4, RES_HOR)
 
 
 N_FRAMES_BG = 64
 
-ALFA_RMS_MIN = 0.01
-CD_RMS_MIN = 0.01
+ALFA_RMS_MIN = 0.001
+CD_RMS_MIN = 0.001
 
 HIST_CD_MAX = 10
 HIST_ALFA_MAX = 20
@@ -28,19 +31,18 @@ G = 1
 B = 2
 
 TAXA_DE_ERRO = 0.1
-SAMPLES_OUT = (320 * 240 * N_FRAMES_HIST * TAXA_DE_ERRO) / 100
+SAMPLES_OUT = (RES_VERT * RES_HOR * N_FRAMES_HIST * TAXA_DE_ERRO) / 100
 
 G_ALFA_MIN = 0.2
 G_ALFA_MAX = 0.7
 
-RES_HOR = 240
-RES_VERT = 320
 
 estatistica = [0, 0, 0, 0, 0]
 numero_quadros = 0
 tempo_processamento = 0
 
-t_CD = 4.5
+t_CD = 3.5
+t_alfa = -300
 
 i_soma = 0
 for i in range(1, N_FRAMES_BG + 1):
@@ -50,7 +52,7 @@ for i in range(1, N_FRAMES_BG + 1):
     i_soma += i_atual.astype(np.float32)
 i_media = i_soma / N_FRAMES_BG
 
-s_num_desvio = np.zeros((240, 320, 3), dtype=np.double)
+s_num_desvio = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.double)
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
     i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
@@ -64,17 +66,17 @@ d_p_b = np.mean(desvio_padrao[..., B], dtype=np.float32)
 
 print 'Desvio padrao'
 
-d_p_qr = np.power(d_p_r, 2)
-d_p_qg = np.power(d_p_g, 2)
-d_p_qb = np.power(d_p_b, 2)
+d_p_qr = np.power(d_p_r, 2) #variancia do R
+d_p_qg = np.power(d_p_g, 2) #variancia do G
+d_p_qb = np.power(d_p_b, 2) #variancia do B
 
 m_q = np.power(i_media, 2)
 
 den = (m_q[..., R] / d_p_qr) + (m_q[..., G] / d_p_qg) + (m_q[..., B] / d_p_qb)
 
-alfa_s = np.zeros((240, 320), dtype=np.float32)
+alfa_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
 
-CD_s = np.zeros((240, 320), dtype=np.float32)
+CD_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
 
 for i in range(1, N_FRAMES_BG + 1):
     ret, i_atual = cap.read()
@@ -99,14 +101,13 @@ for i in range(1, N_FRAMES_BG + 1):
 
     CD_s += np.power(CD, 2)
 
-alfa_rms = np.fix(np.sqrt(np.fix(alfa_s / N_FRAMES_BG)))
+alfa_rms = np.sqrt(np.fix(alfa_s / N_FRAMES_BG))
 
 CD_rms = np.sqrt(CD_s / N_FRAMES_BG)
 
 alfa_rms[alfa_rms < ALFA_RMS_MIN] = ALFA_RMS_MIN
 CD_rms[CD_rms < CD_RMS_MIN] = CD_RMS_MIN
 
-N_FRAMES_BG = 207
 print 'Aprendeu'
 
 while True:
@@ -142,10 +143,12 @@ while True:
     CD = np.sqrt((CDr / d_p_qr) + (CDg / d_p_qg) + (CDb / d_p_qb))
     CD_norm = CD / CD_rms
 
-    objeto1 = np.where(CD_norm > t_CD)
+    objeto1 = np.where((CD_norm > t_CD) | (alfa_n < t_alfa))
+    #objeto1 = np.where((alfa_n < t_alfa))
+    #objeto1 = np.where(CD_norm > t_CD)
 
     im_teste_f = np.zeros((RES_HOR, RES_VERT))
-    im_teste_f[objeto1] = 1
+    #im_teste_f[objeto1] = 1
 
     alfa_lim = np.where(alfa < G_ALFA_MIN)
     alfa_lim1 = np.where(alfa > G_ALFA_MAX)
@@ -172,7 +175,7 @@ while True:
 
     end = cv2.getTickCount()
 
-    print 'FPS: {}'.format(1/((end - start)/cv2.getTickFrequency()))
+    print 'FPS: {}'.format((1/((end - start)/cv2.getTickFrequency())))
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
