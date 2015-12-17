@@ -8,7 +8,7 @@ subprocess.call(["modprobe", "bcm2835-v4l2"])
 time.sleep(1)
 
 print 'switching auto-exposure off..'
-subprocess.call(["v4l2-ctl", "-c", "auto-exposure=1"])
+subprocess.call(["v4l2-ctl", "-c", "auto_exposure=1"])
 print 'switching white_balance to manual..'
 subprocess.call(["v4l2-ctl", "-c", "white_balance_auto_preset=0"])
 print 'disabling power_line_frequency detection..'
