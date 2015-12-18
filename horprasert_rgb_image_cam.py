@@ -188,15 +188,16 @@ def main_flux():
                               args=[i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms])
     task_1.setDaemon(True)
 
+    '''
     task_2 = threading.Thread(name='task_2', target=segment_image,
                               args=[i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms])
     task_2.setDaemon(True)
-
+    '''
     task_1.start()
-    task_2.start()
+    #task_2.start()
 
     task_1.join()
-    task_2.join()
+    #task_2.join()
 
     '''
     while True:
