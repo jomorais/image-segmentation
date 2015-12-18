@@ -1,6 +1,8 @@
 __author__ = 'jmorais'
 import numpy as np
 import cv2
+import threading
+import coloredlogs, logging
 
 cap = cv2.VideoCapture(0)
 RES_HOR = 240
@@ -44,142 +46,167 @@ tempo_processamento = 0
 t_CD = 3.5
 t_alfa = -150
 
-i_soma = 0
-for i in range(1, N_FRAMES_BG + 1):
-    ret, i_atual = cap.read()
-    #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
-    # i_atual = misc.imread('images/image{}.bmp'.format(i))
-    i_soma += i_atual.astype(np.float32)
-i_media = i_soma / N_FRAMES_BG
 
-s_num_desvio = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.double)
-for i in range(1, N_FRAMES_BG + 1):
-    ret, i_atual = cap.read()
-    #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
-    # i_atual = misc.imread('images/image{}.bmp'.format(i))
-    s_num_desvio += np.power(i_atual.astype(np.float32) - i_media, 2)
-desvio_padrao = np.sqrt(s_num_desvio / (N_FRAMES_BG - 1))
+def segment_image(i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
+    while True:
+        start = cv2.getTickCount()
 
-d_p_r = np.mean(desvio_padrao[..., R], dtype=np.float32)
-d_p_g = np.mean(desvio_padrao[..., G], dtype=np.float32)
-d_p_b = np.mean(desvio_padrao[..., B], dtype=np.float32)
+        ret, frame = cap.read()
+        cv2.imshow('original', frame)
 
-print 'Desvio padrao'
+        im_teste = frame.astype(np.float32)
 
-d_p_qr = np.power(d_p_r, 2) #variancia do R
-d_p_qg = np.power(d_p_g, 2) #variancia do G
-d_p_qb = np.power(d_p_b, 2) #variancia do B
+        im_teste_r = im_teste[:, :, R]
+        im_teste_g = im_teste[:, :, G]
+        im_teste_b = im_teste[:, :, B]
 
-m_q = np.power(i_media, 2)
+        imagem_atual = im_teste
 
-den = (m_q[..., R] / d_p_qr) + (m_q[..., G] / d_p_qg) + (m_q[..., B] / d_p_qb)
+        d_n = np.empty_like(imagem_atual)
+        d_n[:, :, R] = (imagem_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
+        d_n[:, :, G] = (imagem_atual[:, :, G] * i_media[:, :, G]) / d_p_qg
+        d_n[:, :, B] = (imagem_atual[:, :, B] * i_media[:, :, B]) / d_p_qb
 
-alfa_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
+        num = d_n[:, :, R] + d_n[:, :, G] + d_n[:, :, B]
+        alfa = num / den
 
-CD_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
+        alfa_n = (alfa - 1) / alfa_rms
 
-for i in range(1, N_FRAMES_BG + 1):
-    ret, i_atual = cap.read()
-    #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
-    i_atual = i_atual.astype(np.float32)
-    d_n = np.empty_like(i_atual)
-    d_n[:, :, R] = (i_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
-    d_n[:, :, G] = (i_atual[:, :, G] * i_media[:, :, G]) / d_p_qg
-    d_n[:, :, B] = (i_atual[:, :, B] * i_media[:, :, B]) / d_p_qb
+        CDr = np.power((imagem_atual[:, :, R] - (alfa * i_media[:, :, R])), 2)
+        CDg = np.power((imagem_atual[:, :, G] - (alfa * i_media[:, :, G])), 2)
+        CDb = np.power((imagem_atual[:, :, B] - (alfa * i_media[:, :, B])), 2)
+        CD = np.sqrt((CDr / d_p_qr) + (CDg / d_p_qg) + (CDb / d_p_qb))
+        CD_norm = CD / CD_rms
 
-    num = d_n[:, :, R] + d_n[:, :, G] + d_n[:, :, B]
+        objeto1 = np.where((CD_norm > t_CD) | (alfa_n < t_alfa))
+        #objeto1 = np.where((alfa_n < t_alfa))
+        #objeto1 = np.where(CD_norm > t_CD)
 
-    alfa = num / den
+        im_teste_f = np.zeros((RES_HOR, RES_VERT))
+        #im_teste_f[objeto1] = 1
 
-    alfa_s += np.fix(np.power(alfa - 1, 2))
+        #alfa_lim = np.where(alfa < G_ALFA_MIN)
+        #alfa_lim1 = np.where(alfa > G_ALFA_MAX)
 
-    CDr = np.power(i_atual[:, :, R] - (alfa * i_media[:, :, R]), 2)
-    CDg = np.power(i_atual[:, :, G] - (alfa * i_media[:, :, G]), 2)
-    CDb = np.power(i_atual[:, :, B] - (alfa * i_media[:, :, B]), 2)
+        imfinal = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.uint8)
 
-    CD = np.sqrt((CDr / d_p_qr) + (CDg / d_p_qg) + (CDb / d_p_qb))
+        imfinal_r = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
+        imfinal_g = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
+        imfinal_b = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
 
-    CD_s += np.power(CD, 2)
+        im_teste_r = im_teste_r.astype(np.uint8)
+        im_teste_g = im_teste_g.astype(np.uint8)
+        im_teste_b = im_teste_b.astype(np.uint8)
 
-alfa_rms = np.sqrt(np.fix(alfa_s / N_FRAMES_BG))
+        imfinal_r[objeto1] = im_teste_r[objeto1]
+        imfinal_g[objeto1] = im_teste_g[objeto1]
+        imfinal_b[objeto1] = im_teste_b[objeto1]
 
-CD_rms = np.sqrt(CD_s / N_FRAMES_BG)
+        imfinal[:, :, R] = imfinal_r
+        imfinal[:, :, G] = imfinal_g
+        imfinal[:, :, B] = imfinal_b
 
-alfa_rms[alfa_rms < ALFA_RMS_MIN] = ALFA_RMS_MIN
-CD_rms[CD_rms < CD_RMS_MIN] = CD_RMS_MIN
+        #cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
+        cv2.imshow('Analise', imfinal)
 
-print 'Aprendeu'
+        end = cv2.getTickCount()
+        print str(threading.current_thread().name) + ' - FPS: {}'.format((1/((end - start)/cv2.getTickFrequency())))
 
-while True:
-    start = cv2.getTickCount()
-    # im_ref = misc.imread('images/imageref{}.bmp'.format(i)).astype(np.double)
-    # im_ref = np.fix(im_ref * 255)
-    # im_ref = im_ref[..., 0]
-    # frame = misc.imread('images/image{}.bmp'.format(i))
-    ret, frame = cap.read()
-    cv2.imshow('original', frame)
-    #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    im_teste = frame.astype(np.float32)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    im_teste_r = im_teste[:, :, R]
-    im_teste_g = im_teste[:, :, G]
-    im_teste_b = im_teste[:, :, B]
 
-    imagem_atual = im_teste
+def main_flux():
 
-    d_n = np.empty_like(imagem_atual)
-    d_n[:, :, R] = (imagem_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
-    d_n[:, :, G] = (imagem_atual[:, :, G] * i_media[:, :, G]) / d_p_qg
-    d_n[:, :, B] = (imagem_atual[:, :, B] * i_media[:, :, B]) / d_p_qb
+    i_soma = 0
+    for i in range(1, N_FRAMES_BG + 1):
+        ret, i_atual = cap.read()
+        #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+        # i_atual = misc.imread('images/image{}.bmp'.format(i))
+        i_soma += i_atual.astype(np.float32)
+    i_media = i_soma / N_FRAMES_BG
 
-    num = d_n[:, :, R] + d_n[:, :, G] + d_n[:, :, B]
-    alfa = num / den
+    s_num_desvio = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.double)
+    for i in range(1, N_FRAMES_BG + 1):
+        ret, i_atual = cap.read()
+        #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+        # i_atual = misc.imread('images/image{}.bmp'.format(i))
+        s_num_desvio += np.power(i_atual.astype(np.float32) - i_media, 2)
+    desvio_padrao = np.sqrt(s_num_desvio / (N_FRAMES_BG - 1))
 
-    alfa_n = (alfa - 1) / alfa_rms
+    d_p_r = np.mean(desvio_padrao[..., R], dtype=np.float32)
+    d_p_g = np.mean(desvio_padrao[..., G], dtype=np.float32)
+    d_p_b = np.mean(desvio_padrao[..., B], dtype=np.float32)
 
-    CDr = np.power((imagem_atual[:, :, R] - (alfa * i_media[:, :, R])), 2)
-    CDg = np.power((imagem_atual[:, :, G] - (alfa * i_media[:, :, G])), 2)
-    CDb = np.power((imagem_atual[:, :, B] - (alfa * i_media[:, :, B])), 2)
-    CD = np.sqrt((CDr / d_p_qr) + (CDg / d_p_qg) + (CDb / d_p_qb))
-    CD_norm = CD / CD_rms
+    print 'Desvio padrao'
 
-    objeto1 = np.where((CD_norm > t_CD) | (alfa_n < t_alfa))
-    #objeto1 = np.where((alfa_n < t_alfa))
-    #objeto1 = np.where(CD_norm > t_CD)
+    d_p_qr = np.power(d_p_r, 2) #variancia do R
+    d_p_qg = np.power(d_p_g, 2) #variancia do G
+    d_p_qb = np.power(d_p_b, 2) #variancia do B
 
-    im_teste_f = np.zeros((RES_HOR, RES_VERT))
-    #im_teste_f[objeto1] = 1
+    m_q = np.power(i_media, 2)
 
-    #alfa_lim = np.where(alfa < G_ALFA_MIN)
-    #alfa_lim1 = np.where(alfa > G_ALFA_MAX)
+    den = (m_q[..., R] / d_p_qr) + (m_q[..., G] / d_p_qg) + (m_q[..., B] / d_p_qb)
 
-    imfinal = np.zeros((RES_HOR, RES_VERT, 3), dtype=np.uint8)
+    alfa_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
 
-    imfinal_r = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
-    imfinal_g = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
-    imfinal_b = np.zeros((RES_HOR, RES_VERT), dtype=np.uint8)
+    CD_s = np.zeros((RES_HOR, RES_VERT), dtype=np.float32)
 
-    im_teste_r = im_teste_r.astype(np.uint8)
-    im_teste_g = im_teste_g.astype(np.uint8)
-    im_teste_b = im_teste_b.astype(np.uint8)
+    for i in range(1, N_FRAMES_BG + 1):
+        ret, i_atual = cap.read()
+        #i_atual = cv2.cvtColor(i_atual, cv2.COLOR_BGR2RGB)
+        i_atual = i_atual.astype(np.float32)
+        d_n = np.empty_like(i_atual)
+        d_n[:, :, R] = (i_atual[:, :, R] * i_media[:, :, R]) / d_p_qr
+        d_n[:, :, G] = (i_atual[:, :, G] * i_media[:, :, G]) / d_p_qg
+        d_n[:, :, B] = (i_atual[:, :, B] * i_media[:, :, B]) / d_p_qb
 
-    imfinal_r[objeto1] = im_teste_r[objeto1]
-    imfinal_g[objeto1] = im_teste_g[objeto1]
-    imfinal_b[objeto1] = im_teste_b[objeto1]
+        num = d_n[:, :, R] + d_n[:, :, G] + d_n[:, :, B]
 
-    imfinal[:, :, R] = imfinal_r
-    imfinal[:, :, G] = imfinal_g
-    imfinal[:, :, B] = imfinal_b
+        alfa = num / den
 
-    #cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
-    cv2.imshow('Analise', imfinal)
+        alfa_s += np.fix(np.power(alfa - 1, 2))
 
-    end = cv2.getTickCount()
+        CDr = np.power(i_atual[:, :, R] - (alfa * i_media[:, :, R]), 2)
+        CDg = np.power(i_atual[:, :, G] - (alfa * i_media[:, :, G]), 2)
+        CDb = np.power(i_atual[:, :, B] - (alfa * i_media[:, :, B]), 2)
 
-    print 'FPS: {}'.format((1/((end - start)/cv2.getTickFrequency())))
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        CD = np.sqrt((CDr / d_p_qr) + (CDg / d_p_qg) + (CDb / d_p_qb))
 
-# When everything done, release the capture
-cap.release()
-cv2.destroyAllWindows()
+        CD_s += np.power(CD, 2)
+
+    alfa_rms = np.sqrt(np.fix(alfa_s / N_FRAMES_BG))
+
+    CD_rms = np.sqrt(CD_s / N_FRAMES_BG)
+
+    alfa_rms[alfa_rms < ALFA_RMS_MIN] = ALFA_RMS_MIN
+    CD_rms[CD_rms < CD_RMS_MIN] = CD_RMS_MIN
+
+    print 'Aprendeu'
+
+    task_1 = threading.Thread(name='task_1', target=segment_image,
+                              args=[i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms])
+    task_1.setDaemon(True)
+
+    task_2 = threading.Thread(name='task_2', target=segment_image,
+                              args=[i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms])
+    task_2.setDaemon(True)
+
+    task_1.start()
+    task_2.start()
+
+    task_1.join()
+    task_2.join()
+
+    '''
+    while True:
+
+        segment_image(i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms)
+    '''
+
+    # When everything done, release the capture
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main_flux()
