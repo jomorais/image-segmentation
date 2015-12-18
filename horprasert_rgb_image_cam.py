@@ -184,7 +184,7 @@ def main_flux():
 
     print 'Aprendeu'
 
-    processes = [mp.Process(target=segment_image, args=(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms)) for task in range(2)]
+    processes = [mp.Process(target=segment_image, args=(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms)) for task in range(1)]
 
     for p in processes:
         p.start()
