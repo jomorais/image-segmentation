@@ -2,6 +2,7 @@ __author__ = 'jmorais'
 import numpy as np
 import cv2
 import multiprocessing as mp
+import time
 import coloredlogs, logging
 
 cap = cv2.VideoCapture(0)
@@ -50,10 +51,13 @@ t_alfa = -150
 def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
     while True:
         start = cv2.getTickCount()
-
+        t1 = time.time()
         ret, frame = cap.read()
+        t2 = time.time()
+        t_frame_capture = t2 - t1
         cv2.imshow('original', frame)
-
+        t1 = time.time()
+        t_imshow = t1 - t2
         im_teste = frame.astype(np.float32)
 
         im_teste_r = im_teste[:, :, R]
@@ -106,11 +110,16 @@ def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
         imfinal[:, :, G] = imfinal_g
         imfinal[:, :, B] = imfinal_b
 
+        t2 = time.time()
+        t_calcs = t2 - t1
         #cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
         cv2.imshow('Analise', imfinal)
+        t1 = time.time()
+        t_imshow2 = t1 - t2
 
         end = cv2.getTickCount()
-        print str(task) + ' - FPS: {}'.format((1/((end - start)/cv2.getTickFrequency())))
+        print str(task) + ' - FPS: {}, fr_cap: {}, imshow1: {}, t_calcs: {}, imshow2: {}'.format(
+            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_imshow, t_calcs, t_imshow2)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
