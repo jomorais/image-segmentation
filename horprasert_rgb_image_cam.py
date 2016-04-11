@@ -118,8 +118,8 @@ def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
         t_imshow2 = t1 - t2
 
         end = cv2.getTickCount()
-        print str(task) + ' - FPS: {}, fr_cap: {}, imshow1: {}, t_calcs: {}, imshow2: {}'.format(
-            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_imshow, t_calcs, t_imshow2)
+        print 'FPS: {}, fr_cap: {}, imshow1: {}, t_calcs: {}, imshow2: {}, tot: {}'.format(
+            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_imshow, t_calcs, t_imshow2, (end-start)/cv2.getTickFrequency())
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
