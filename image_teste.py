@@ -13,6 +13,7 @@ while(True):
     inicio_mostra = time.time()
     cv2.imshow('teste', frame)
     fim_mostra = time.time()
+
     if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     else:

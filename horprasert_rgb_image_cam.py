@@ -14,7 +14,7 @@ ret = cap.set(4, RES_HOR)
 #RES_HOR = 480
 #RES_VERT = 640
 
-N_FRAMES_BG = 64
+N_FRAMES_BG = 16
 
 ALFA_RMS_MIN = 0.001
 CD_RMS_MIN = 0.001
@@ -55,9 +55,9 @@ def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
         ret, frame = cap.read()
         t2 = time.time()
         t_frame_capture = t2 - t1
-        cv2.imshow('original', frame)
+        #cv2.imshow('original', frame)
         t1 = time.time()
-        t_imshow = t1 - t2
+        #t_imshow = t1 - t2
         im_teste = frame.astype(np.float32)
 
         im_teste_r = im_teste[:, :, R]
@@ -118,8 +118,8 @@ def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
         t_imshow2 = t1 - t2
 
         end = cv2.getTickCount()
-        print 'FPS: {}, fr_cap: {}, imshow1: {}, t_calcs: {}, imshow2: {}, tot: {}'.format(
-            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_imshow, t_calcs, t_imshow2, (end-start)/cv2.getTickFrequency())
+        print 'FPS: {}, fr_cap: {}, t_calcs: {}, imshow2: {}, tot: {}'.format(
+            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_calcs, t_imshow2, (end-start)/cv2.getTickFrequency())
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
