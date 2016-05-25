@@ -7,6 +7,7 @@ from multiprocessing import Pool
 import time
 import threading
 import os
+import sys
 
 cap = cv2.VideoCapture(0)
 RES_HOR = 240
@@ -120,13 +121,20 @@ def segment_image(free_worker_queue, new_frames_queue, processed_frames_queue, i
     print 'pid: {} exitting..'.format(pid)
 
 
-def feed_new_frames(new_frames_queue, free_worker_queue):
+def feed_new_frames(number_of_processes, new_frames_queue, free_worker_queue):
+    first_time = True
+    count_delay = 0
+    delay = 1/number_of_processes
     while True:
+        t1 = time.time()
         free_process_id = free_worker_queue.get()
-        print "feed_new_frames - process {} is free..".format(free_process_id)
+        #print "feed_new_frames - process {} is free..".format(free_process_id)
         ret, frame = cap.read()
         new_frames_queue.put(frame.astype(np.float32))
-
+        if count_delay < number_of_processes:
+            delay = max(delay - (time.time() - t1), 0)
+            time.sleep(delay)
+            count_delay += 1
         if main_process_poison_pill:
             break
     print 'exiting feed_new_frames thread..'
@@ -136,7 +144,11 @@ if __name__ == '__main__':
     new_frames_queue = manager.Queue()
     free_worker_queue = manager.Queue()
     processed_frames_queue = manager.Queue()
-    NBR_PROCESSES = 2
+    if len(sys.argv) >= 2:
+        NBR_PROCESSES = sys.argv[1]
+    else:
+        print 'inform number of concurrent processes.. assuming 1'
+        NBR_PROCESSES = 1
 
     i_soma = 0
     for i in range(1, N_FRAMES_BG + 1):
@@ -205,7 +217,7 @@ if __name__ == '__main__':
     print 'Aprendeu'
 
     thrd = threading.Thread(target=feed_new_frames,
-                            args=(new_frames_queue, free_worker_queue))
+                            args=(NBR_PROCESSES, new_frames_queue, free_worker_queue))
     thrd.start()
 
     pool = Pool(processes=NBR_PROCESSES)
