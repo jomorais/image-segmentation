@@ -1,9 +1,12 @@
-__author__ = 'jmorais'
+__author__ = 'nilson'
+
 import numpy as np
 import cv2
-import multiprocessing as mp
+import multiprocessing
+from multiprocessing import Pool
 import time
-import coloredlogs, logging
+import threading
+import os
 
 cap = cv2.VideoCapture(0)
 RES_HOR = 240
@@ -47,18 +50,19 @@ tempo_processamento = 0
 t_CD = 3.5
 t_alfa = -150
 
+main_process_poison_pill = False
 
-def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
+
+def segment_image(free_worker_queue, new_frames_queue, processed_frames_queue, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
+    pid = os.getpid()
     while True:
-        start = cv2.getTickCount()
         t1 = time.time()
-        ret, frame = cap.read()
-        t2 = time.time()
-        t_frame_capture = t2 - t1
-        #cv2.imshow('original', frame)
-        t1 = time.time()
-        #t_imshow = t1 - t2
-        im_teste = frame.astype(np.float32)
+        free_worker_queue.put(pid)
+        im_teste = new_frames_queue.get()
+
+        if im_teste[0, 0][0] < 0:
+            #poison pill taken..
+            break
 
         im_teste_r = im_teste[:, :, R]
         im_teste_g = im_teste[:, :, G]
@@ -111,22 +115,28 @@ def segment_image(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms):
         imfinal[:, :, G] = imfinal_g
         imfinal[:, :, B] = imfinal_b
 
-        t2 = time.time()
-        t_calcs = t2 - t1
-        #cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
-        cv2.imshow('Analise', imfinal)
-        t1 = time.time()
-        t_imshow2 = t1 - t2
+        processed_frames_queue.put(imfinal)
+        print 'pid: {}, t_calc: {}'.format(pid, time.time() - t1)
+    print 'pid: {} exitting..'.format(pid)
 
-        end = cv2.getTickCount()
-        print 'FPS: {}, fr_cap: {}, t_calcs: {}, imshow2: {}, tot: {}'.format(
-            (1/((end - start)/cv2.getTickFrequency())), t_frame_capture, t_calcs, t_imshow2, (end-start)/cv2.getTickFrequency())
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+def feed_new_frames(new_frames_queue, free_worker_queue):
+    while True:
+        free_process_id = free_worker_queue.get()
+        print "feed_new_frames - process {} is free..".format(free_process_id)
+        ret, frame = cap.read()
+        new_frames_queue.put(frame.astype(np.float32))
+
+        if main_process_poison_pill:
             break
+    print 'exiting feed_new_frames thread..'
 
-
-def main_flux():
+if __name__ == '__main__':
+    manager = multiprocessing.Manager()
+    new_frames_queue = manager.Queue()
+    free_worker_queue = manager.Queue()
+    processed_frames_queue = manager.Queue()
+    NBR_PROCESSES = 2
 
     i_soma = 0
     for i in range(1, N_FRAMES_BG + 1):
@@ -194,32 +204,40 @@ def main_flux():
 
     print 'Aprendeu'
 
-    processes = [mp.Process(target=segment_image, args=(task, i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms)) for task in range(1)]
+    thrd = threading.Thread(target=feed_new_frames,
+                            args=(new_frames_queue, free_worker_queue))
+    thrd.start()
 
-    for p in processes:
+    pool = Pool(processes=NBR_PROCESSES)
+    processes = []
+    for _ in range(NBR_PROCESSES):
+        p = multiprocessing.Process(target=segment_image,
+                                    args=(free_worker_queue, new_frames_queue, processed_frames_queue,
+                                          i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms))
+        processes.append(p)
         p.start()
 
-    for p in processes:
-        p.join()
-
-
-    '''
-    task_2 = threading.Thread(name='task_2', target=segment_image,
-                              args=[i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms])
-    task_2.setDaemon(True)
-    task_2.start()
-    task_2.join()
-    '''
-
-    '''
     while True:
+        start = cv2.getTickCount()
+        #cv2.imshow('Analise', cv2.cvtColor(imfinal, cv2.COLOR_RGB2BGR))
+        imfinal = processed_frames_queue.get()
+        cv2.imshow('Analise', imfinal)
 
-        segment_image(i_media, d_p_qr, d_p_qg, d_p_qb, den, alfa_rms, CD_rms)
-    '''
+        end = cv2.getTickCount()
+        print 'mainThread - FPS: {}'.format((1/((end - start)/cv2.getTickFrequency())))
 
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            main_process_poison_pill = True
+            thrd.join()
+            imfinal = imfinal.astype(np.float32)
+            imfinal[0, 0][0] = -1
+            print 'mainThread poison: {}'.format(imfinal[0, 0][0])
+            for _ in range(NBR_PROCESSES):
+                new_frames_queue.put(imfinal)
+            time.sleep(0.5)
+            break
+
+    print 'main thread exitting..'
     # When everything done, release the capture
     cap.release()
     cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    main_flux()
