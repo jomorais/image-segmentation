@@ -145,7 +145,7 @@ if __name__ == '__main__':
     free_worker_queue = manager.Queue()
     processed_frames_queue = manager.Queue()
     if len(sys.argv) >= 2:
-        NBR_PROCESSES = sys.argv[1]
+        NBR_PROCESSES = int(sys.argv[1])
     else:
         print 'inform number of concurrent processes.. assuming 1'
         NBR_PROCESSES = 1
